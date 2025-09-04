@@ -1,0 +1,7 @@
+Pour la présentation :
+    - Biblio + contexte
+    - Implémentation rapide (améliorations par exemple (parallelisme, matrice perso, structure de données, E-values))
+    - Résultats (comparaison perso, comparaison avec les résultats du papier de recherche)
+
+Blast II :
+    - Double match, programmation dynamique avec seuil
