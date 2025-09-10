@@ -259,11 +259,42 @@ def find_double_hits(dico_mots, database, w, A):
                     diagonal = pos_in_querry - pos_in_seq
                     if diagonal in last_hit:
                         if w <= pos_in_querry - last_hit[diagonal] <= A:
-                            doubles_hits.add((seq_id, pos_in_seq, pos_in_querry)) # On ajoute que le second hits, que l'on va étendre
+                            doubles_hits.add((seq_id, pos_in_querry, pos_in_seq)) # On ajoute que le second hits, que l'on va étendre
                     last_hit[diagonal] = pos_in_querry
     return doubles_hits
 
-def run_proteines_gapped(w, n, taille_database, seuil_t, A):
+def find_hits_need_extension(list_hit, sequence, database, w, M, Sg, x_drop, seed_window_length = 11):
+    hits_nead_extension = set()
+    for hit in list_hit:
+        seq_id, _, _ = hit
+        best_qL, best_sL, best_qR, best_sR, total_best = extend_hit(hit, sequence, database, w, M, x_drop) 
+        if total_best >= Sg:
+            best_seed_q = best_qL
+            best_seed_s = best_sL
+            qL = best_qL
+            sL = best_sL
+            if best_qR - best_qL + 1 < seed_window_length:
+                seed_q = (best_qL + best_qR) // 2
+                seed_s = (best_sL + best_sR) // 2
+                hits_nead_extension.add((seq_id, seed_q, seed_s))
+            score = sum(M[sequence[best_qL + i]][database[seq_id][best_sL + i]] for i in range(seed_window_length))
+            best_score = score
+            for i in range(best_qR - best_qL - seed_window_length + 1):
+                qL = qL + 1
+                sL = sL + 1
+                score = score - M[sequence[qL - 1]][database[seq_id][sL - 1]] + M[sequence[qL + seed_window_length - 1]][database[seq_id][sL + seed_window_length - 1]]
+                if score > best_score:
+                    best_score = score
+                    best_seed_q = qL
+                    best_seed_s = sL
+            seed_s = best_seed_s + seed_window_length // 2
+            seed_q = best_seed_q + seed_window_length // 2
+            if best_score >= Sg:
+                hits_nead_extension.add((seq_id, seed_q, seed_s))
+    return hits_nead_extension
+
+
+def run_proteines_gapped(w, n, taille_database, seuil_t, A, x_drop, Sg):
     alphabete_proteines = 'ACDEFGHIKLMNPQRSTVWY'
     database = [''.join(random.choices(alphabete_proteines, k=random.randint(1000, 5000))) for _ in range(taille_database)]
 
@@ -322,6 +353,8 @@ def run_proteines_gapped(w, n, taille_database, seuil_t, A):
     hits_double = find_double_hits(liste, database, w, A)
     print(f"Nombre de doubles hits trouvés : {len(hits_double)}")
 
+    hits_need_extension = find_hits_need_extension(hits_double, sequence, database, w, PAM250, Sg, x_drop)
+    print(f"Nombre de hits à étendre trouvés : {len(hits_need_extension)}")
 if __name__ == "__main__":
     # ADN aléatoire
     # Paramètres
@@ -344,8 +377,7 @@ if __name__ == "__main__":
     taille_database_proteines_ungapped = 1000 # taille de la base de données
 
 
-    run_proteines_ungapped(w_proteines_ungapped, n_proteines_ungapped, taille_database_proteines_ungapped, seuil_t_proteines_ungapped, seuil_proteines_ungapped, taille_database_proteines_ungapped)
-
+    # Gapped
     w_proteines_gapped = 3    # taille des mots
     n_proteines_gapped = 250 # taille de la séquence
     seuil_t_proteines_gapped = 11 # seuil de score pour garder un alignement
@@ -353,6 +385,7 @@ if __name__ == "__main__":
     A_gapped = 40
     x_drop_proteines_gapped = 16
     taille_database_proteines_gapped = 1000 # taille de la base de données
+    Sg = 42 # seuil de score pour trigger une gapped extension
 
 
-    run_proteines_gapped(w_proteines_gapped, n_proteines_gapped, taille_database_proteines_gapped, seuil_t_proteines_gapped, A_gapped)
+    run_proteines_gapped(w_proteines_gapped, n_proteines_gapped, taille_database_proteines_gapped, seuil_t_proteines_gapped, A_gapped, x_drop_proteines_gapped, Sg)
