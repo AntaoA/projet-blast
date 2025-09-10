@@ -3,6 +3,7 @@
 
 
 import random
+from unittest import result
 
 #  Dico des mots
 def construire_dico_mots(seq, w):
@@ -293,13 +294,12 @@ def find_hits_need_extension(list_hit, query, database, w, M, Sg, x_drop, seed_w
                 hits_nead_extension.add((seq_id, seed_q, seed_s))
     return hits_nead_extension
 
-def extend_gapped(list_hit, query, database, M, x_drop,
-                  ouverture=10, extension=1, direction="right"):
+def extend_gapped(hit, query, database, M, x_drop, ouverture=10, extension=1, direction="right"):
     """
     Extension gappée type BLAST II avec X-drop.
     
     Args:
-        list_hit : liste de (seq_id, qi, si) positions du seed
+        hit : (seq_id, qi, si) positions du seed
         query, database : séquences
         M : matrice de substitution, indexée par lettres
         x_drop : seuil d'élagage
@@ -307,98 +307,101 @@ def extend_gapped(list_hit, query, database, M, x_drop,
         direction : "right" ou "left"
     
     Returns:
-        Liste de tuples (score_max, q_pos, s_pos)
+        (score_max, q_pos, s_pos)
     """
-    results = []
+    seq_id, qi, si = hit
+    seq_db = database[seq_id]
 
-    for seq_id, qi, si in list_hit:
-        seq_db = database[seq_id]
+    # longueur dispo selon la direction
+    if direction == "right":
+        n, m = len(query) - qi, len(seq_db) - si
+        q_start, s_start = qi, si
+        q_step, s_step = +1, +1
+    elif direction == "left":
+        n, m = qi + 1, si + 1
+        q_start, s_start = qi, si
+        q_step, s_step = -1, -1
+    else:
+        raise ValueError("direction must be 'right' or 'left'")
 
-        # longueur dispo selon la direction
-        if direction == "right":
-            n, m = len(query) - qi, len(seq_db) - si
-            q_start, s_start = qi, si
-            q_step, s_step = +1, +1
-        elif direction == "left":
-            n, m = qi + 1, si + 1
-            q_start, s_start = qi, si
-            q_step, s_step = -1, -1
-        else:
-            raise ValueError("direction must be 'right' or 'left'")
+    # états : dictionnaires "colonne -> valeur"
+    H_prev, E_prev, F_prev = {}, {}, {}
+    H_curr, E_curr, F_curr = {}, {}, {}
 
-        # états : dictionnaires "colonne -> valeur"
-        H_prev, E_prev, F_prev = {}, {}, {}
-        H_curr, E_curr, F_curr = {}, {}, {}
+    # init au seed (0,0 dans repère local)
+    H_prev[0] = M[query[qi]][seq_db[si]]
+    E_prev[0] = float("-inf")
+    F_prev[0] = float("-inf")
 
-        # init au seed (0,0 dans repère local)
-        H_prev[0] = M[query[qi]][seq_db[si]]
-        E_prev[0] = float("-inf")
-        F_prev[0] = float("-inf")
+    max_score = H_prev[0]
+    best_q, best_s = qi, si
 
-        max_score = H_prev[0]
-        best_q, best_s = qi, si
+    active_cols = {0}
 
-        active_cols = {0}
+    for i in range(1, n):
+        H_curr.clear()
+        E_curr.clear()
+        F_curr.clear()
+        new_active_cols = set()
 
-        for i in range(1, n):
-            H_curr.clear()
-            E_curr.clear()
-            F_curr.clear()
-            new_active_cols = set()
+        for j in active_cols:
+            if j+1 > m:
+                continue
 
-            for j in active_cols:
-                if j+1 > m:
-                    continue
+            # gap vertical (insertion dans DB → avance query)
+            e_val = max(H_prev.get(j, float("-inf")) - ouverture,
+                        E_prev.get(j, float("-inf")) - extension)
+            E_curr[j] = e_val
 
-                # gap vertical (insertion dans DB → avance query)
-                e_val = max(H_prev.get(j, float("-inf")) - ouverture,
-                            E_prev.get(j, float("-inf")) - extension)
-                E_curr[j] = e_val
+            # gap horizontal (insertion dans query → avance DB)
+            f_val = max(
+                (H_curr.get(j-1, float("-inf")) - extension) if j-1 in H_curr else float("-inf"),
+                H_prev.get(j-1, float("-inf")) - ouverture,
+                F_curr.get(j-1, float("-inf"))
+            )
+            F_curr[j] = f_val
 
-                # gap horizontal (insertion dans query → avance DB)
-                f_val = max(
-                    (H_curr.get(j-1, float("-inf")) - extension) if j-1 in H_curr else float("-inf"),
-                    H_prev.get(j-1, float("-inf")) - ouverture,
-                    F_curr.get(j-1, float("-inf"))
-                )
-                F_curr[j] = f_val
+            # match / substitution
+            if j-1 in H_prev:
+                q_idx = q_start + i*q_step
+                s_idx = s_start + j*s_step
+                sub = H_prev[j-1] + M[query[q_idx]][seq_db[s_idx]]
+            else:
+                sub = float("-inf")
 
-                # match / substitution
-                if j-1 in H_prev:
-                    q_idx = q_start + i*q_step
-                    s_idx = s_start + j*s_step
-                    sub = H_prev[j-1] + M[query[q_idx]][seq_db[s_idx]]
-                else:
-                    sub = float("-inf")
+            h_val = max(0, sub, e_val, f_val)
+            H_curr[j] = h_val
 
-                h_val = max(0, sub, e_val, f_val)
-                H_curr[j] = h_val
+            if h_val > max_score:
+                max_score = h_val
+                best_q = q_start + i*q_step
+                best_s = s_start + j*s_step
 
-                if h_val > max_score:
-                    max_score = h_val
-                    best_q = q_start + i*q_step
-                    best_s = s_start + j*s_step
+            # X-drop pruning
+            if h_val >= max_score - x_drop:
+                new_active_cols.add(j)
+                if j+1 <= m:
+                    new_active_cols.add(j+1)
 
-                # X-drop pruning
-                if h_val >= max_score - x_drop:
-                    new_active_cols.add(j)
-                    if j+1 <= m:
-                        new_active_cols.add(j+1)
+        H_prev, E_prev, F_prev = H_curr.copy(), E_curr.copy(), F_curr.copy()
+        active_cols = new_active_cols
+    
+        if not active_cols:
+            break
 
-            H_prev, E_prev, F_prev = H_curr.copy(), E_curr.copy(), F_curr.copy()
-            active_cols = new_active_cols
+    return max_score, best_q, best_s
 
-            if not active_cols:
-                break
-
-        results.append((max_score, best_q, best_s))
-
+def find_alignments_gapped(hits, query, database, M, seuil_accept, x_drop):
+    results = set()
+    for hit in hits:
+        score_right, best_q_right, best_s_right = extend_gapped(hit, query, database, M, x_drop, 10, 1, "right")
+        score_left, best_q_left, best_s_left = extend_gapped(hit, query, database, M, x_drop, 10, 1, "left")
+        total_score = score_left + score_right - M[query[hit[1]]][database[hit[0]][hit[2]]]
+        if total_score >= seuil_accept:
+            results.add((total_score, hit[0], best_q_left, best_q_right, best_s_left, best_s_right))
     return results
 
-        
-        
-
-def run_proteines_gapped(w, n, taille_database, seuil_t, A, x_drop, Sg):
+def run_proteines_gapped(w, n, taille_database, seuil_t, seuil_proteines_gapped, A, x_drop, Sg):
     alphabete_proteines = 'ACDEFGHIKLMNPQRSTVWY'
     database = [''.join(random.choices(alphabete_proteines, k=random.randint(1000, 5000))) for _ in range(taille_database)]
 
@@ -460,6 +463,15 @@ def run_proteines_gapped(w, n, taille_database, seuil_t, A, x_drop, Sg):
     hits_need_extension = find_hits_need_extension(hits_double, sequence, database, w, PAM250, Sg, x_drop)
     print(f"Nombre de hits à étendre trouvés : {len(hits_need_extension)}")
     
+    alignements = find_alignments_gapped(hits_need_extension, sequence, database, PAM250, seuil_proteines_gapped, x_drop)
+    print(f"Nombre d'alignements gappés trouvés : {len(alignements)}")
+    alignements = sorted(alignements, reverse=True)
+    for score, seq_id, qL, qR, sL, sR in alignements:
+        print(f"Alignement trouvé dans la séquence {seq_id} avec un score de {score}")
+        print(f"Sequence 1: {sequence[qL:qR+1]} (positions {qL} à {qR})")
+        print(f"Sequence 2: {database[seq_id][sL:sR+1]} (positions {sL} à {sR})")
+        print()
+    
 
 if __name__ == "__main__":
     # ADN aléatoire
@@ -494,4 +506,4 @@ if __name__ == "__main__":
     Sg = 42 # seuil de score pour trigger une gapped extension
 
 
-    run_proteines_gapped(w_proteines_gapped, n_proteines_gapped, taille_database_proteines_gapped, seuil_t_proteines_gapped, A_gapped, x_drop_proteines_gapped, Sg)
+    run_proteines_gapped(w_proteines_gapped, n_proteines_gapped, taille_database_proteines_gapped, seuil_t_proteines_gapped, seuil_proteines_gapped, A_gapped, x_drop_proteines_gapped, Sg)
