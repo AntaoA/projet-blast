@@ -263,11 +263,11 @@ def find_double_hits(dico_mots, database, w, A):
                     last_hit[diagonal] = pos_in_querry
     return doubles_hits
 
-def find_hits_need_extension(list_hit, sequence, database, w, M, Sg, x_drop, seed_window_length = 11):
+def find_hits_need_extension(list_hit, query, database, w, M, Sg, x_drop, seed_window_length = 11):
     hits_nead_extension = set()
     for hit in list_hit:
         seq_id, _, _ = hit
-        best_qL, best_sL, best_qR, best_sR, total_best = extend_hit(hit, sequence, database, w, M, x_drop) 
+        best_qL, best_sL, best_qR, best_sR, total_best = extend_hit(hit, query, database, w, M, x_drop) 
         if total_best >= Sg:
             best_seed_q = best_qL
             best_seed_s = best_sL
@@ -277,12 +277,12 @@ def find_hits_need_extension(list_hit, sequence, database, w, M, Sg, x_drop, see
                 seed_q = (best_qL + best_qR) // 2
                 seed_s = (best_sL + best_sR) // 2
                 hits_nead_extension.add((seq_id, seed_q, seed_s))
-            score = sum(M[sequence[best_qL + i]][database[seq_id][best_sL + i]] for i in range(seed_window_length))
+            score = sum(M[query[best_qL + i]][database[seq_id][best_sL + i]] for i in range(seed_window_length))
             best_score = score
             for i in range(best_qR - best_qL - seed_window_length + 1):
                 qL = qL + 1
                 sL = sL + 1
-                score = score - M[sequence[qL - 1]][database[seq_id][sL - 1]] + M[sequence[qL + seed_window_length - 1]][database[seq_id][sL + seed_window_length - 1]]
+                score = score - M[query[qL - 1]][database[seq_id][sL - 1]] + M[query[qL + seed_window_length - 1]][database[seq_id][sL + seed_window_length - 1]]
                 if score > best_score:
                     best_score = score
                     best_seed_q = qL
@@ -293,6 +293,110 @@ def find_hits_need_extension(list_hit, sequence, database, w, M, Sg, x_drop, see
                 hits_nead_extension.add((seq_id, seed_q, seed_s))
     return hits_nead_extension
 
+def extend_gapped(list_hit, query, database, M, x_drop,
+                  ouverture=10, extension=1, direction="right"):
+    """
+    Extension gappée type BLAST II avec X-drop.
+    
+    Args:
+        list_hit : liste de (seq_id, qi, si) positions du seed
+        query, database : séquences
+        M : matrice de substitution, indexée par lettres
+        x_drop : seuil d'élagage
+        ouverture, extension : coûts des gaps
+        direction : "right" ou "left"
+    
+    Returns:
+        Liste de tuples (score_max, q_pos, s_pos)
+    """
+    results = []
+
+    for seq_id, qi, si in list_hit:
+        seq_db = database[seq_id]
+
+        # longueur dispo selon la direction
+        if direction == "right":
+            n, m = len(query) - qi, len(seq_db) - si
+            q_start, s_start = qi, si
+            q_step, s_step = +1, +1
+        elif direction == "left":
+            n, m = qi + 1, si + 1
+            q_start, s_start = qi, si
+            q_step, s_step = -1, -1
+        else:
+            raise ValueError("direction must be 'right' or 'left'")
+
+        # états : dictionnaires "colonne -> valeur"
+        H_prev, E_prev, F_prev = {}, {}, {}
+        H_curr, E_curr, F_curr = {}, {}, {}
+
+        # init au seed (0,0 dans repère local)
+        H_prev[0] = M[query[qi]][seq_db[si]]
+        E_prev[0] = float("-inf")
+        F_prev[0] = float("-inf")
+
+        max_score = H_prev[0]
+        best_q, best_s = qi, si
+
+        active_cols = {0}
+
+        for i in range(1, n):
+            H_curr.clear()
+            E_curr.clear()
+            F_curr.clear()
+            new_active_cols = set()
+
+            for j in active_cols:
+                if j+1 > m:
+                    continue
+
+                # gap vertical (insertion dans DB → avance query)
+                e_val = max(H_prev.get(j, float("-inf")) - ouverture,
+                            E_prev.get(j, float("-inf")) - extension)
+                E_curr[j] = e_val
+
+                # gap horizontal (insertion dans query → avance DB)
+                f_val = max(
+                    (H_curr.get(j-1, float("-inf")) - extension) if j-1 in H_curr else float("-inf"),
+                    H_prev.get(j-1, float("-inf")) - ouverture,
+                    F_curr.get(j-1, float("-inf"))
+                )
+                F_curr[j] = f_val
+
+                # match / substitution
+                if j-1 in H_prev:
+                    q_idx = q_start + i*q_step
+                    s_idx = s_start + j*s_step
+                    sub = H_prev[j-1] + M[query[q_idx]][seq_db[s_idx]]
+                else:
+                    sub = float("-inf")
+
+                h_val = max(0, sub, e_val, f_val)
+                H_curr[j] = h_val
+
+                if h_val > max_score:
+                    max_score = h_val
+                    best_q = q_start + i*q_step
+                    best_s = s_start + j*s_step
+
+                # X-drop pruning
+                if h_val >= max_score - x_drop:
+                    new_active_cols.add(j)
+                    if j+1 <= m:
+                        new_active_cols.add(j+1)
+
+            H_prev, E_prev, F_prev = H_curr.copy(), E_curr.copy(), F_curr.copy()
+            active_cols = new_active_cols
+
+            if not active_cols:
+                break
+
+        results.append((max_score, best_q, best_s))
+
+    return results
+
+        
+        
 
 def run_proteines_gapped(w, n, taille_database, seuil_t, A, x_drop, Sg):
     alphabete_proteines = 'ACDEFGHIKLMNPQRSTVWY'
@@ -355,6 +459,8 @@ def run_proteines_gapped(w, n, taille_database, seuil_t, A, x_drop, Sg):
 
     hits_need_extension = find_hits_need_extension(hits_double, sequence, database, w, PAM250, Sg, x_drop)
     print(f"Nombre de hits à étendre trouvés : {len(hits_need_extension)}")
+    
+
 if __name__ == "__main__":
     # ADN aléatoire
     # Paramètres
