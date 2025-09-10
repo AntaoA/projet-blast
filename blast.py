@@ -82,6 +82,45 @@ def extend_hit(hit, sequence, database, w, M, x_drop=20):
     return (best_qL, best_sL, best_qR, best_sR, total_best)
 
 
+def run_adn_ungapped(w, n, x_drop, seuil, taille_database):
+    nb_mots = n - w + 1
+    database = [''.join(random.choices('ACGT', k=random.randint(1000, 5000))) for _ in range(taille_database)]
+
+    sequence = ''.join(random.choices('ACGT', k=n))
+
+    matrice_substitution = {
+        'A': {'A': 5, 'C': -4, 'G': -4, 'T': -4},
+        'C': {'A': -4, 'C': 5, 'G': -4, 'T': -4},
+        'G': {'A': -4, 'C': -4, 'G': 5, 'T': -4},
+        'T': {'A': -4, 'C': -4, 'G': -4, 'T': 5},
+    }
+
+    dico_mots = construire_dico_mots(sequence, w)
+    hits = find_hits(dico_mots, database, w)
+    
+    print(f"Nombre de hits trouvés : {len(hits)}")
+    
+    alignements = {}
+    
+    for hit in hits:
+        alignment = extend_hit(hit, sequence, database, w, matrice_substitution, x_drop)
+        qL, sL, qR, sR, score = alignment
+        if score >= seuil:
+
+            if score not in alignements:
+                alignements[score] = set()
+            alignements[score].add((qL, sL, qR, sR, hit[0]))
+
+            print(f"Alignement trouvé dans la séquence {hit[0]} avec un score de {score}")
+            print(f"Sequence 1: {sequence[qL:qR+1]} (positions {qL} à {qR})")
+            print(f"Sequence 2: {database[hit[0]][sL:sR+1]} (positions {sL} à {sR})")
+            print()
+
+
+    alignements = dict(sorted(alignements.items(), reverse=True))
+    print(alignements)
+    
+ 
 
 
 # Protéines
@@ -127,73 +166,15 @@ def construire_liste_voisins(sequence, w, matrice_substitution, seuil_t):
             voisins[voisin].update(pos)
 
     return voisins
-
-if __name__ == "__main__":
-    # ADN aléatoire
-    # Paramètres
-    '''
-    w = 13  # taille des mots
-    n = 500 # taille de la séquence
-    nb_mots = n - w + 1
-    x_drop = 20
-    seuil = 50 # seuil de score pour garder un alignement
-    taille_database = 1000 # taille de la base de données
-    database = [''.join(random.choices('ACGT', k=random.randint(1000, 5000))) for _ in range(taille_database)]
-
-    sequence = ''.join(random.choices('ACGT', k=n))
-
-    matrice_substitution = {
-        'A': {'A': 5, 'C': -4, 'G': -4, 'T': -4},
-        'C': {'A': -4, 'C': 5, 'G': -4, 'T': -4},
-        'G': {'A': -4, 'C': -4, 'G': 5, 'T': -4},
-        'T': {'A': -4, 'C': -4, 'G': -4, 'T': 5},
-    }
-
-
-
-
-    dico_mots = construire_dico_mots(sequence, w)
-    hits = find_hits(dico_mots, database, w)
-    
-    print(f"Nombre de hits trouvés : {len(hits)}")
-    
-    alignements = {}
-    
-    for hit in hits:
-        alignment = extend_hit(hit, sequence, database, w, matrice_substitution, x_drop)
-        qL, sL, qR, sR, score = alignment
-        if score >= seuil:
-
-            if score not in alignements:
-                alignements[score] = set()
-            alignements[score].add((qL, sL, qR, sR, hit[0]))
-
-            print(f"Alignement trouvé dans la séquence {hit[0]} avec un score de {score}")
-            print(f"Sequence 1: {sequence[qL:qR+1]} (positions {qL} à {qR})")
-            print(f"Sequence 2: {database[hit[0]][sL:sR+1]} (positions {sL} à {sR})")
-            print()
-
-
-    alignements = dict(sorted(alignements.items(), reverse=True))
-    print(alignements)
-    '''
-    
-    
-    
-    # Protéines aléatoires
-    # Paramètres
+   
+def run_proteines_ungapped(w, n, x_drop, seuil_t, seuil, taille_database):
     alphabete_proteines = 'ACDEFGHIKLMNPQRSTVWY'
-    
-    w = 4     # taille des mots
-    n = 500 # taille de la séquence
-    seuil_t = 17 # seuil de score pour garder un alignement
-    seuil = 80 # seuil de score pour garder un alignement
-    x_drop = 20
-    taille_database = 1000 # taille de la base de données
+    nb_mots = n - w + 1
     database = [''.join(random.choices(alphabete_proteines, k=random.randint(1000, 5000))) for _ in range(taille_database)]
 
     sequence = ''.join(random.choices(alphabete_proteines, k=n))
 
+    # TODO : import matrices de substitutions
     PAM250 = {
         'A': {'A':  2, 'R': -2, 'N':  0, 'D':  0, 'C': -2, 'Q':  0, 'E':  0, 'G':  1, 'H': -1, 'I': -1,
             'L': -2, 'K': -1, 'M': -1, 'F': -3, 'P':  1, 'S':  1, 'T':  1, 'W': -6, 'Y': -3, 'V':  0},
@@ -237,9 +218,6 @@ if __name__ == "__main__":
             'L':  2, 'K': -2, 'M':  2, 'F': -1, 'P': -1, 'S': -1, 'T':  0, 'W': -6, 'Y': -2, 'V':  4}
     }
     
-    
-    
-    
     liste = construire_liste_voisins(sequence, w, PAM250, seuil_t)
     print(f"Nombre de voisins générés : {len(liste)}")
     
@@ -267,3 +245,29 @@ if __name__ == "__main__":
     print(len(alignements))
     for score in alignements:
         print(f"Score: {score}, Nombre d'alignements: {len(alignements[score])}")
+        
+        
+        
+if __name__ == "__main__":
+    # ADN aléatoire
+    # Paramètres
+
+    w_adn_ungapped = 13  # taille des mots
+    n_adn_ungapped = 500 # taille de la séquence
+    nb_mots = n_adn_ungapped - w_adn_ungapped + 1
+    x_drop_adn_ungapped = 20
+    seuil_adn_ungapped = 50 # seuil de score pour garder un alignement
+    taille_database_adn_ungapped = 1000 # taille de la base de données
+
+
+    # Protéines aléatoires
+    # Paramètres
+    w_proteines_ungapped = 4     # taille des mots
+    n_proteines_ungapped = 500 # taille de la séquence
+    seuil_t_proteines_ungapped = 17 # seuil de score pour garder un alignement
+    seuil_proteines_ungapped = 80 # seuil de score pour garder un alignement
+    x_drop_proteines_ungapped = 20
+    taille_database_proteines_ungapped = 1000 # taille de la base de données
+
+    run_proteines_ungapped(w_proteines_ungapped, n_proteines_ungapped, x_drop_proteines_ungapped, seuil_t_proteines_ungapped, seuil_proteines_ungapped, taille_database_proteines_ungapped)
+    
