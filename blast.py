@@ -248,7 +248,7 @@ def run_proteines_ungapped(w, n, x_drop, seuil_t, seuil, taille_database):
         
 # Gapped
 def find_double_hits(dico_mots, database, w, A):
-    doubles_hits = []
+    doubles_hits = set()
     
     for seq_id, seq in enumerate(database):
         last_hit = {}
@@ -258,17 +258,76 @@ def find_double_hits(dico_mots, database, w, A):
                 for pos_in_querry in dico_mots[mot]:
                     diagonal = pos_in_querry - pos_in_seq
                     if diagonal in last_hit:
-                        if pos_in_querry - last_hit[diagonal] <= A:
-                            doubles_hits.append((seq_id, pos_in_seq, pos_in_querry))
+                        if w <= pos_in_querry - last_hit[diagonal] <= A:
+                            doubles_hits.add((seq_id, pos_in_seq, pos_in_querry)) # On ajoute que le second hits, que l'on va étendre
                     last_hit[diagonal] = pos_in_querry
     return doubles_hits
+
+def run_proteines_gapped(w, n, taille_database, seuil_t, A):
+    alphabete_proteines = 'ACDEFGHIKLMNPQRSTVWY'
+    database = [''.join(random.choices(alphabete_proteines, k=random.randint(1000, 5000))) for _ in range(taille_database)]
+
+    sequence = ''.join(random.choices(alphabete_proteines, k=n))
+
+    # TODO : import matrices de substitutions
+    PAM250 = {
+        'A': {'A':  2, 'R': -2, 'N':  0, 'D':  0, 'C': -2, 'Q':  0, 'E':  0, 'G':  1, 'H': -1, 'I': -1,
+            'L': -2, 'K': -1, 'M': -1, 'F': -3, 'P':  1, 'S':  1, 'T':  1, 'W': -6, 'Y': -3, 'V':  0},
+        'R': {'A': -2, 'R':  6, 'N':  0, 'D': -1, 'C': -4, 'Q':  1, 'E': -1, 'G': -3, 'H':  2, 'I': -2,
+            'L': -3, 'K':  3, 'M':  0, 'F': -4, 'P':  0, 'S':  0, 'T': -1, 'W':  2, 'Y': -4, 'V': -2},
+        'N': {'A':  0, 'R':  0, 'N':  2, 'D':  2, 'C': -4, 'Q':  1, 'E':  1, 'G':  0, 'H':  2, 'I': -2,
+            'L': -3, 'K':  1, 'M': -2, 'F': -3, 'P':  0, 'S':  1, 'T':  0, 'W': -4, 'Y': -2, 'V': -2},
+        'D': {'A':  0, 'R': -1, 'N':  2, 'D':  4, 'C': -5, 'Q':  2, 'E':  3, 'G':  1, 'H':  1, 'I': -2,
+            'L': -4, 'K':  0, 'M': -3, 'F': -6, 'P': -1, 'S':  0, 'T':  0, 'W': -7, 'Y': -4, 'V': -2},
+        'C': {'A': -2, 'R': -4, 'N': -4, 'D': -5, 'C': 12, 'Q': -5, 'E': -5, 'G': -3, 'H': -3, 'I': -2,
+            'L': -6, 'K': -5, 'M': -5, 'F': -4, 'P': -3, 'S':  0, 'T': -2, 'W': -8, 'Y':  0, 'V': -2},
+        'Q': {'A':  0, 'R':  1, 'N':  1, 'D':  2, 'C': -5, 'Q':  4, 'E':  2, 'G': -1, 'H':  3, 'I': -2,
+            'L': -2, 'K':  1, 'M': -1, 'F': -5, 'P':  0, 'S': -1, 'T': -1, 'W': -5, 'Y': -4, 'V': -2},
+        'E': {'A':  0, 'R': -1, 'N':  1, 'D':  3, 'C': -5, 'Q':  2, 'E':  4, 'G':  0, 'H':  1, 'I': -2,
+            'L': -3, 'K':  0, 'M': -2, 'F': -5, 'P': -1, 'S':  0, 'T':  0, 'W': -7, 'Y': -4, 'V': -2},
+        'G': {'A':  1, 'R': -3, 'N':  0, 'D':  1, 'C': -3, 'Q': -1, 'E':  0, 'G':  5, 'H': -2, 'I': -3,
+            'L': -4, 'K': -2, 'M': -3, 'F': -5, 'P':  0, 'S':  1, 'T':  0, 'W': -7, 'Y': -5, 'V': -1},
+        'H': {'A': -1, 'R':  2, 'N':  2, 'D':  1, 'C': -3, 'Q':  3, 'E':  1, 'G': -2, 'H':  6, 'I': -2,
+            'L': -2, 'K':  0, 'M': -2, 'F': -2, 'P':  0, 'S': -1, 'T': -1, 'W': -3, 'Y':  0, 'V': -2},
+        'I': {'A': -1, 'R': -2, 'N': -2, 'D': -2, 'C': -2, 'Q': -2, 'E': -2, 'G': -3, 'H': -2, 'I':  5,
+            'L':  2, 'K': -2, 'M':  2, 'F':  1, 'P': -2, 'S': -1, 'T':  0, 'W': -5, 'Y': -1, 'V':  4},
+        'L': {'A': -2, 'R': -3, 'N': -3, 'D': -4, 'C': -6, 'Q': -2, 'E': -3, 'G': -4, 'H': -2, 'I':  2,
+            'L':  6, 'K': -3, 'M':  4, 'F':  2, 'P': -3, 'S': -3, 'T': -2, 'W': -2, 'Y': -1, 'V':  2},
+        'K': {'A': -1, 'R':  3, 'N':  1, 'D':  0, 'C': -5, 'Q':  1, 'E':  0, 'G': -2, 'H':  0, 'I': -2,
+            'L': -3, 'K':  5, 'M':  0, 'F': -5, 'P': -1, 'S':  0, 'T':  0, 'W': -3, 'Y': -4, 'V': -2},
+        'M': {'A': -1, 'R':  0, 'N': -2, 'D': -3, 'C': -5, 'Q': -1, 'E': -2, 'G': -3, 'H': -2, 'I':  2,
+            'L':  4, 'K':  0, 'M':  6, 'F':  0, 'P': -2, 'S': -2, 'T': -1, 'W': -4, 'Y': -2, 'V':  2},
+        'F': {'A': -3, 'R': -4, 'N': -3, 'D': -6, 'C': -4, 'Q': -5, 'E': -5, 'G': -5, 'H': -2, 'I':  1,
+            'L':  2, 'K': -5, 'M':  0, 'F':  9, 'P': -5, 'S': -3, 'T': -3, 'W':  0, 'Y':  7, 'V': -1},
+        'P': {'A':  1, 'R':  0, 'N':  0, 'D': -1, 'C': -3, 'Q':  0, 'E': -1, 'G':  0, 'H':  0, 'I': -2,
+            'L': -3, 'K': -1, 'M': -2, 'F': -5, 'P':  6, 'S':  1, 'T':  0, 'W': -6, 'Y': -5, 'V': -1},
+        'S': {'A':  1, 'R':  0, 'N':  1, 'D':  0, 'C':  0, 'Q': -1, 'E':  0, 'G':  1, 'H': -1, 'I': -1,
+            'L': -3, 'K':  0, 'M': -2, 'F': -3, 'P':  1, 'S':  2, 'T':  1, 'W': -2, 'Y': -3, 'V': -1},
+        'T': {'A':  1, 'R': -1, 'N':  0, 'D':  0, 'C': -2, 'Q': -1, 'E':  0, 'G':  0, 'H': -1, 'I':  0,
+            'L': -2, 'K':  0, 'M': -1, 'F': -3, 'P':  0, 'S':  1, 'T':  3, 'W': -5, 'Y': -3, 'V':  0},
+        'W': {'A': -6, 'R':  2, 'N': -4, 'D': -7, 'C': -8, 'Q': -5, 'E': -7, 'G': -7, 'H': -3, 'I': -5,
+            'L': -2, 'K': -3, 'M': -4, 'F':  0, 'P': -6, 'S': -2, 'T': -5, 'W': 17, 'Y':  0, 'V': -6},
+        'Y': {'A': -3, 'R': -4, 'N': -2, 'D': -4, 'C':  0, 'Q': -4, 'E': -4, 'G': -5, 'H':  0, 'I': -1,
+            'L': -1, 'K': -4, 'M': -2, 'F':  7, 'P': -5, 'S': -3, 'T': -3, 'W':  0, 'Y': 10, 'V': -2},
+        'V': {'A':  0, 'R': -2, 'N': -2, 'D': -2, 'C': -2, 'Q': -2, 'E': -2, 'G': -1, 'H': -2, 'I':  4,
+            'L':  2, 'K': -2, 'M':  2, 'F': -1, 'P': -1, 'S': -1, 'T':  0, 'W': -6, 'Y': -2, 'V':  4}
+    }
+    
+    liste = construire_liste_voisins(sequence, w, PAM250, seuil_t)
+    print(f"Nombre de voisins générés : {len(liste)}")
+    
+    hits_simple = find_hits(liste, database, w)
+    print(f"Nombre de hits simples trouvés : {len(hits_simple)}")
+    
+    hits_double = find_double_hits(liste, database, w, A)
+    print(f"Nombre de doubles hits trouvés : {len(hits_double)}")
 
 if __name__ == "__main__":
     # ADN aléatoire
     # Paramètres
 
     w_adn_ungapped = 13  # taille des mots
-    n_adn_ungapped = 500 # taille de la séquence
+    n_adn_ungapped = 250 # taille de la séquence
     nb_mots = n_adn_ungapped - w_adn_ungapped + 1
     x_drop_adn_ungapped = 20
     seuil_adn_ungapped = 50 # seuil de score pour garder un alignement
@@ -277,9 +336,23 @@ if __name__ == "__main__":
 
     # Protéines aléatoires
     # Paramètres
-    w_proteines_ungapped = 4     # taille des mots
-    n_proteines_ungapped = 500 # taille de la séquence
-    seuil_t_proteines_ungapped = 17 # seuil de score pour garder un alignement
+    w_proteines_ungapped = 3     # taille des mots
+    n_proteines_ungapped = 250 # taille de la séquence
+    seuil_t_proteines_ungapped = 13 # seuil de score pour garder un alignement
     seuil_proteines_ungapped = 80 # seuil de score pour garder un alignement
     x_drop_proteines_ungapped = 20
     taille_database_proteines_ungapped = 1000 # taille de la base de données
+
+
+    run_proteines_ungapped(w_proteines_ungapped, n_proteines_ungapped, taille_database_proteines_ungapped, seuil_t_proteines_ungapped, seuil_proteines_ungapped, taille_database_proteines_ungapped)
+
+    w_proteines_gapped = 3    # taille des mots
+    n_proteines_gapped = 250 # taille de la séquence
+    seuil_t_proteines_gapped = 11 # seuil de score pour garder un alignement
+    seuil_proteines_gapped = 80 # seuil de score pour garder un alignement
+    A_gapped = 40
+    x_drop_proteines_gapped = 16
+    taille_database_proteines_gapped = 1000 # taille de la base de données
+
+
+    run_proteines_gapped(w_proteines_gapped, n_proteines_gapped, taille_database_proteines_gapped, seuil_t_proteines_gapped, A_gapped)
