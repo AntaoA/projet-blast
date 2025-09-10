@@ -278,6 +278,7 @@ def find_hits_need_extension(list_hit, query, database, w, M, Sg, x_drop, seed_w
                 seed_q = (best_qL + best_qR) // 2
                 seed_s = (best_sL + best_sR) // 2
                 hits_nead_extension.add((seq_id, seed_q, seed_s))
+                continue
             score = sum(M[query[best_qL + i]][database[seq_id][best_sL + i]] for i in range(seed_window_length))
             best_score = score
             for i in range(best_qR - best_qL - seed_window_length + 1):
