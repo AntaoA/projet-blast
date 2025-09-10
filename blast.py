@@ -124,7 +124,7 @@ def run_adn_ungapped(w, n, x_drop, seuil, taille_database):
 
 
 # Protéines
-
+# Ungapped
 def construire_mots_initiaux(sequence, w):
     mots_initiaux = {}
     nb_mots = len(sequence) - w + 1
@@ -246,8 +246,23 @@ def run_proteines_ungapped(w, n, x_drop, seuil_t, seuil, taille_database):
     for score in alignements:
         print(f"Score: {score}, Nombre d'alignements: {len(alignements[score])}")
         
-        
-        
+# Gapped
+def find_double_hits(dico_mots, database, w, A):
+    doubles_hits = []
+    
+    for seq_id, seq in enumerate(database):
+        last_hit = {}
+        for pos_in_seq in range(len(seq) - w + 1):
+            mot = seq[pos_in_seq:pos_in_seq + w]
+            if mot in dico_mots:
+                for pos_in_querry in dico_mots[mot]:
+                    diagonal = pos_in_querry - pos_in_seq
+                    if diagonal in last_hit:
+                        if pos_in_querry - last_hit[diagonal] <= A:
+                            doubles_hits.append((seq_id, pos_in_seq, pos_in_querry))
+                    last_hit[diagonal] = pos_in_querry
+    return doubles_hits
+
 if __name__ == "__main__":
     # ADN aléatoire
     # Paramètres
@@ -268,6 +283,3 @@ if __name__ == "__main__":
     seuil_proteines_ungapped = 80 # seuil de score pour garder un alignement
     x_drop_proteines_ungapped = 20
     taille_database_proteines_ungapped = 1000 # taille de la base de données
-
-    run_proteines_ungapped(w_proteines_ungapped, n_proteines_ungapped, x_drop_proteines_ungapped, seuil_t_proteines_ungapped, seuil_proteines_ungapped, taille_database_proteines_ungapped)
-    
