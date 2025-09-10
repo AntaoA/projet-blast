@@ -5,3 +5,14 @@ Pour la présentation :
 
 Blast II :
     - Double match, programmation dynamique avec seuil
+
+
+Blast :
+    - Liste de mots
+
+    - Balayage de la database pour trouver les hits
+
+    - Extension des hits
+
+    - MSP : maximal segment pair
+        Paire de score la plus élevée entre deux segments de même taille dans deux séquences
