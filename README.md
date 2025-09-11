@@ -37,12 +37,12 @@ uv run blast.py test3 --db-sizes 500 1000 2000 3000 --seed 1
 ### Ou tester différentes implémenations de blast (paramètres non nécessaires et modifiables) :
 **ungapped ADN (BLAST I)**
 ```bash
-python blast.py adn --w 13 --n 250 --x-drop 20 --seuil 50 --db 1000 --seed 7
+uv run blast.py adn --w 13 --n 250 --x-drop 20 --seuil 50 --db 1000 --seed 7
 ```
 
 **ungapped protéines (BLAST I)**
 ```bash
-python blast.py prot-ungapped --T 13 --seuil 80 --db 1000
+uv run blast.py prot-ungapped --T 13 --seuil 80 --db 1000
 ```
 
 **gapped protéines (BLAST II)**
