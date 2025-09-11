@@ -21,7 +21,7 @@ uv sync
 
 **Test 1 – Hits vs T**
 ```bash
-uv run blast.py test1 --w 3 --n 250 --db 300 --A 40 --delta 3 --seed 1337
+uv run blast.py test1 --w 3 --n 250 --db 300 --A 40 --delta 3
 ```
 
 **Test 2 - S_accept**
@@ -31,13 +31,13 @@ uv run blast.py test2 --T1 13 --T2 11 --A 30 --x-drop 16 --x-drop-gapped 40 --Sg
 
 **Test 3 - temps vs DB** :
 ```bash
-uv run blast.py test3 --db-sizes 500 1000 2000 3000 --seed 1
+uv run blast.py test3 --db-sizes 500 1000 2000 3000
 ```
 
 ### Ou tester différentes implémenations de blast (paramètres non nécessaires et modifiables) :
 **ungapped ADN (BLAST I)**
 ```bash
-uv run blast.py adn --w 13 --n 250 --x-drop 20 --seuil 50 --db 1000 --seed 7
+uv run blast.py adn --w 13 --n 250 --x-drop 20 --seuil 50 --db 1000
 ```
 
 **ungapped protéines (BLAST I)**
