@@ -622,9 +622,9 @@ def test_hits_vs_T(w=3, n=250, taille_db=200,
     # Plot
     T_vals, hits_vals, doubles_vals, hits_shift_vals = zip(*results)
     plt.figure(figsize=(8, 5))
-    plt.plot(T_vals, hits_vals, marker="s", label="Hits simples (BLAST I)")
+    plt.plot(T_vals, hits_vals, marker="s", label="Hits simples (BLAST I et II)")
     plt.plot(T_vals, hits_shift_vals, marker="o", linestyle="--",
-             label=f"Hits simples (T-{delta}, BLAST II)")
+             label=f"Hits simples (T+{delta}, BLAST I)")
     plt.plot(T_vals, doubles_vals, marker="^", label="Doubles hits (BLAST II)")
     plt.xlabel("Seuil T")
     plt.ylabel("Nombre de hits (log)")
